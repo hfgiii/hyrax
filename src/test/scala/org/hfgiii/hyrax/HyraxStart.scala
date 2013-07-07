@@ -7,6 +7,6 @@ package org.hfgiii.hyrax
  * Time: 10:36 AM
  * To change this template use File | Settings | File Templates.
  */
-class HyraxStart {
+class HyraxStart  {
 
 }

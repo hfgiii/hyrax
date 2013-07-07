@@ -1,7 +1,7 @@
 <link href="markdown.css" rel="stylesheet"/>
 
 ![x](hyrax-100.png)
-##Overview
+##Overview 
 
 #####Hyrax is scala version of [Hystrix](https://github.com/Netflix/Hystrix/wiki) using scala Futures/Promises and Akka Actors/ActorSystems for the dependency resilience layer. It uses Akka IO for remote dependencies. It will only support web services initially and use spray to handle HTTP request/response. The spray Http client/service layer is built on top of akka IO. Any further protocols, such as ftp, jms or zeromq, will be implemented on top of Akka IO. Akka IO already supports tcp and udp.
 
