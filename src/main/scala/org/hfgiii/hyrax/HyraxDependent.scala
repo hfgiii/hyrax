@@ -17,6 +17,6 @@ import akka.pattern.CircuitBreaker
  * with Saks.
  *
  */
-class HyraxDependent {
+trait HyraxDependent {
 
 }
