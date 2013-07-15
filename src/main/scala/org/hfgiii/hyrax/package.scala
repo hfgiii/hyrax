@@ -23,6 +23,7 @@ package object hyrax  {
     class DependentConfig
 
 
+
        trait InsureDependent[T <: Extension, IDIO <: ExtensionId[T] ] {
           def insure(numberOfDependents:Int)(implicit io:IDIO):InsureDependent[T,IDIO]
           def of [I,O](service:(I) => O) :Unit
