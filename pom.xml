@@ -12,7 +12,7 @@
     <properties>
         <scala-version>2.10.2</scala-version>
         <spray-version>1.2-M8</spray-version>
-        <akka-version>2.2-SNAPSHOT</akka-version>
+        <akka-version>2.2.0</akka-version>
     </properties>
      <dependencies>
          <dependency>
@@ -87,11 +87,12 @@
             <name>Maven Central</name>
             <url>http://mvnrepository.com/</url>
         </repository>
+        <!--
         <repository>
             <id>akka</id>
             <name>Akka Respository</name>
             <url>http://repo.akka.io/snapshots/</url>
-        </repository>
+        </repository> -->
 
         <repository>
             <id>spray</id>
