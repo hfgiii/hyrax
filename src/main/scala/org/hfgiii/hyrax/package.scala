@@ -10,6 +10,7 @@ import spray.client.pipelining._
 import akka.util.Timeout
 import akka.pattern._
 import scala.concurrent.{Future, ExecutionContext}
+import scala.collection.immutable.HashMap
 
 /**
  * User: hfgiii
@@ -51,11 +52,16 @@ package object hyrax  {
                                        timeout:Duration                 = FiniteDuration(100,MICROSECONDS),
                                        dependents:Int                   = 10) extends DependencyTrait
 
-    case class HttpDependencyConfiguration(sr:Future[SendReceive],dependent:DependentFunctionTrait = helloWorldDependent,
-                                           fallback:FallbackTrait       = goodbyeCruelWordFallback,
-                                           retries:Int                  = 1 ,
-                                           timeout:Duration             = FiniteDuration(100,MICROSECONDS),
-                                           dependents:Int               = 10) extends DependencyTrait
+    case class HttpDependencyConfiguration(sr:Future[SendReceive],
+                                           dependent:DependentFunctionTrait = helloWorldDependent,
+                                           fallback:FallbackTrait           = goodbyeCruelWordFallback,
+                                           retries:Int                      = 1 ,
+                                           timeout:Duration                 = FiniteDuration(100,MICROSECONDS),
+                                           dependents:Int                   = 10) extends DependencyTrait
+
+    case class AccumulatedDependency(fallback:FallbackTrait    = goodbyeCruelWordFallback,
+                                     retries:Int               = 1 ,
+                                     timeout:Duration          = FiniteDuration(100,MICROSECONDS))
 
     sealed trait DependentConfig
 
@@ -69,61 +75,137 @@ package object hyrax  {
 
     trait FallbackConfig1[FI,FO] extends FallbackTrait {
 
-       val fallback   : (FI) => FO
+       val fallback   : FI => FO
 
     }
 
     sealed trait DependentFunctionTrait
 
     trait DependentFunctionConfig0[OO] extends DependentFunctionTrait {
-
       val runfunc     : () => OO
-
     }
 
     trait DependentFunctionConfig1[II,OO] extends DependentFunctionTrait {
-
-      val runfunc    : (II) => OO
-
+      val runfunc    :  II => OO
     }
 
-    trait InsureDependent[T <: Extension, IDIO <: ExtensionId[T]] {
-       val dependencyTrait:DependencyTrait
-
-       def insure  (numberOfDependents:Int) : InsureDependent[T,IDIO]
-       def of [I,O](service:(I) => O)       : InsureDependent[T,IDIO]
-
+    trait InsureDependent[T <: Extension, IDIO <: ExtensionId[T],C <: DependencyTrait] {
+      def insure    (numberOfDependents:Int)              : ServiceDependent[C]
     }
 
-    def fallback_=[T <: Extension, IDIO <: ExtensionId[T],FI,FO](fb:(FI) => FO)(implicit dependent:InsureDependent[T,IDIO])  {
-
+    trait ServiceDependent[C <: DependencyTrait] {
+      def of [I,O](service: I => O)  : DependencyRequirement[C]
     }
 
-    implicit object InsureHttpDependent extends InsureDependent[HttpExt,Http.type] {
-      val dependencyTrait:DependencyTrait = NoDependency
-      def insure(numberOfDependents:Int):InsureDependent[HttpExt,Http.type] = {
-        implicit val timeout: Timeout = 10.seconds
-        implicit val system           = ActorSystem()
-        implicit val ec               = ExecutionContext.Implicits.global
+    trait DependencyRequirement[C <: DependencyTrait] {
+      def requiring (config: => ConfigAccumulator) : C
+    }
 
-         val config:Config = ConfigFactory.load
+     def fallback[FI,FO](fb:(FI) => FO):ConfigAccumulator = {
+        val caccum   = new ConfigAccumulator()
+        val fbConfig = new FallbackConfig1[FI,FO] {
+                          val fallback = fb
+                       }
 
-         val host = config.getString("host")
-         val port = config.getString("port")
-         val sr =
-         for { Http.HostConnectorInfo(connector, _) <- IO(Http) ? Http.HostConnectorSetup(host,port.toInt) } yield sendReceive(connector)
+        caccum + ("fallback" -> AccumulatedDependency(fallback = fbConfig))
+     }
+     /*
+     def timeout(to:FiniteDuration):ConfigAccumulator = {
+         val caccum  = new ConfigAccumulator()
+             caccum += ("timeout" -> AccumulatedDependency(timeout = to))
+     }
 
-         new InsureDependent[HttpExt,Http.type] {
+     def retries(r:Int):ConfigAccumulator = {
+         val caccum   = new ConfigAccumulator()
+             caccum  += ("retries" -> AccumulatedDependency(timeout = to))
+     }    */
 
-           val dependencyTrait:DependencyTrait = HttpDependencyConfiguration(sr,dependents = numberOfDependents)
+    class ConfigAccumulator(dmap:HashMap[String,AccumulatedDependency] = HashMap.empty[String,AccumulatedDependency]) {
+        val dependencyMap = dmap
 
-           def insure(numberOfDependents:Int):InsureDependent[HttpExt,Http.type]     = this
 
-           def of [I,O](service:(I) => O)       : InsureDependent[HttpExt,Http.type] =  InsureHttpDependent.of(service)
-         }
+      /*
+      def fallback[FI,FO](fb:(FI) => FO):ConfigAccumulator = {
+        val caccum   = new ConfigAccumulator()
+        val fbConfig = new FallbackConfig1[FI,FO] {
+          val fallback = fallback
+        }
+
+        caccum += ("fallback" -> AccumulatedDependency(fallback = fbConfig))
+      } */
+
+      def + (v:(String, AccumulatedDependency)):ConfigAccumulator = {
+           val dmap = dependencyMap + v
+
+           new ConfigAccumulator(dmap)
       }
 
+      def get(key:String):Option[AccumulatedDependency] =
+           dependencyMap.get(key)
 
-      def of [I,O](service:(I) => O)       : InsureDependent[HttpExt,Http.type] = this
+      def timeout(to:Duration):ConfigAccumulator = {
+        val caccum   = new ConfigAccumulator()
+            caccum  + ("timeout" -> AccumulatedDependency(timeout = to))
+      }
+
+      def retries(r:Int):ConfigAccumulator = {
+        val caccum   = new ConfigAccumulator()
+            caccum  + ("retries" -> AccumulatedDependency(retries = r))
+      }
+
     }
+
+  implicit def HttpInsured(http:Http.type): InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration]  = {
+    implicit val timeout: Timeout = 10 seconds
+    implicit val system           = ActorSystem()
+    implicit val ec               = ExecutionContext.Implicits.global
+
+    //val config:Config = ConfigFactory.load
+
+    val host = "localhost"  //config.getString("hyrax.host")
+    val port = "8080"       //config.getString("hyrax.port")
+    val sr   =
+        for { Http.HostConnectorInfo(connector, _) <- IO(Http) ? Http.HostConnectorSetup(host,port.toInt) } yield sendReceive(connector)
+
+    new InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration] {
+
+      def insure (numberOfDependents:Int)  : ServiceDependent[HttpDependencyConfiguration]  =
+         new ServiceDependent[HttpDependencyConfiguration] {
+
+           def of [I,O](service:I => O)    : DependencyRequirement[HttpDependencyConfiguration]  =
+             new DependencyRequirement[HttpDependencyConfiguration] {
+
+                  val dependencyConfig =
+                  new DependentFunctionConfig1[I,O] {
+                       val runfunc = service
+                  }
+
+                def requiring(config: => ConfigAccumulator):HttpDependencyConfiguration = {
+                    val cfg = config
+                    val http =
+                    for {
+                      fb <- cfg.get("fallback")
+                      to <- cfg.get("timeout")
+                      rt <- cfg.get("retries")
+                    } yield HttpDependencyConfiguration(null,fallback = fb.fallback,timeout = to.timeout,retries = rt.retries)
+
+                    http match {
+                      case Some(HttpDependencyConfiguration(_,_,fb,rt,to,_))  =>
+                             HttpDependencyConfiguration(sr,
+                                                         dependent  = dependencyConfig ,
+                                                         fallback   = fb               ,
+                                                         retries    = rt               ,
+                                                         timeout    = to               ,
+                                                         dependents = numberOfDependents)
+                      case None =>
+                             HttpDependencyConfiguration(sr,
+                                                         dependent  = dependencyConfig ,
+                                                         dependents = numberOfDependents)
+                    }
+                }
+             }
+         }
+     }
+  }
+
 }
