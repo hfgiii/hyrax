@@ -109,30 +109,9 @@ package object hyrax  {
 
         caccum + ("fallback" -> AccumulatedDependency(fallback = fbConfig))
      }
-     /*
-     def timeout(to:FiniteDuration):ConfigAccumulator = {
-         val caccum  = new ConfigAccumulator()
-             caccum += ("timeout" -> AccumulatedDependency(timeout = to))
-     }
-
-     def retries(r:Int):ConfigAccumulator = {
-         val caccum   = new ConfigAccumulator()
-             caccum  += ("retries" -> AccumulatedDependency(timeout = to))
-     }    */
 
     class ConfigAccumulator(dmap:HashMap[String,AccumulatedDependency] = HashMap.empty[String,AccumulatedDependency]) {
         val dependencyMap = dmap
-
-
-      /*
-      def fallback[FI,FO](fb:(FI) => FO):ConfigAccumulator = {
-        val caccum   = new ConfigAccumulator()
-        val fbConfig = new FallbackConfig1[FI,FO] {
-          val fallback = fallback
-        }
-
-        caccum += ("fallback" -> AccumulatedDependency(fallback = fbConfig))
-      } */
 
       def + (v:(String, AccumulatedDependency)):ConfigAccumulator = {
            val dmap = dependencyMap + v
