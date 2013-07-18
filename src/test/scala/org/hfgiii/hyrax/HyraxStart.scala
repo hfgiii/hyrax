@@ -14,9 +14,8 @@ import scala.concurrent.duration._
 
 object HyraxStart  {
 
-      val          get     = (url:String) => Get(url)
-      val          fbfunc  = (str:String) => str
-      implicit val httpc   = HttpDependencyConfiguration (null)
+  val  get     = (url:String) => Get(url)
+  val  fbfunc  = (str:String) => str
 
 
   def main(args: Array[String]) {

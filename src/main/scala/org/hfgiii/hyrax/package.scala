@@ -89,15 +89,15 @@ package object hyrax  {
       val runfunc    :  II => OO
     }
 
-    trait InsureDependent[T <: Extension, IDIO <: ExtensionId[T],C <: DependencyTrait] {
+    trait InsureDependent[C <: DependencyTrait] {
       def insure    (numberOfDependents:Int)              : ServiceDependent[C]
     }
 
     trait ServiceDependent[C <: DependencyTrait] {
-      def of [I,O](service: I => O)  : DependencyRequirement[C]
+      def of [I,O](service: I => O)  : RequirementDependent[C]
     }
 
-    trait DependencyRequirement[C <: DependencyTrait] {
+    trait RequirementDependent[C <: DependencyTrait] {
       def requiring (config: => ConfigAccumulator) : C
     }
 
@@ -135,7 +135,7 @@ package object hyrax  {
 
     }
 
-  implicit def HttpInsured(http:Http.type): InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration]  = {
+  implicit def HttpInsured(http:Http.type): InsureDependent[HttpDependencyConfiguration]  = {
     implicit val timeout: Timeout = 10 seconds
     implicit val system           = ActorSystem()
     implicit val ec               = ExecutionContext.Implicits.global
@@ -148,13 +148,13 @@ package object hyrax  {
         for { Http.HostConnectorInfo(connector, _) <- IO(Http) ? Http.HostConnectorSetup(host,port.toInt) }
         yield sendReceive(connector)
 
-    new InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration] {
+    new InsureDependent[HttpDependencyConfiguration] {
 
       def insure (numberOfDependents:Int)  : ServiceDependent[HttpDependencyConfiguration]  =
          new ServiceDependent[HttpDependencyConfiguration] {
 
-           def of [I,O](service:I => O)    : DependencyRequirement[HttpDependencyConfiguration]  =
-             new DependencyRequirement[HttpDependencyConfiguration] {
+           def of [I,O](service:I => O)    : RequirementDependent[HttpDependencyConfiguration]  =
+             new RequirementDependent[HttpDependencyConfiguration] {
 
                   val dependencyConfig =
                   new DependentFunctionConfig1[I,O] {
