@@ -122,26 +122,18 @@ package object hyrax  {
            new ConfigAccumulator(dmap)
       }
 
-      def ++():ConfigAccumulator = this
-
       def get(key:String):Option[AccumulatedDependency] =
            dependencyMap.get(key)
 
       def timeout(to:Duration):ConfigAccumulator = {
-        val caccum   = new ConfigAccumulator()
-            caccum  + ("timeout" -> AccumulatedDependency(timeout = to))
+            this  + ("timeout" -> AccumulatedDependency(timeout = to))
       }
 
       def retries(r:Int):ConfigAccumulator = {
-        val caccum   = new ConfigAccumulator()
-            caccum  + ("retries" -> AccumulatedDependency(retries = r))
+            this  + ("retries" -> AccumulatedDependency(retries = r))
       }
 
-      def and():ConfigAccumulator = this
-
     }
-
-  val l = List("one","two")
 
   implicit def HttpInsured(http:Http.type): InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration]  = {
     implicit val timeout: Timeout = 10 seconds
