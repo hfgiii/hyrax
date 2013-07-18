@@ -110,6 +110,9 @@ package object hyrax  {
         caccum + ("fallback" -> AccumulatedDependency(fallback = fbConfig))
      }
 
+
+    def become (ca:HttpDependencyConfiguration):HttpDependencyConfiguration = ca
+
     class ConfigAccumulator(dmap:HashMap[String,AccumulatedDependency] = HashMap.empty[String,AccumulatedDependency]) {
         val dependencyMap = dmap
 
@@ -118,6 +121,8 @@ package object hyrax  {
 
            new ConfigAccumulator(dmap)
       }
+
+      def ++():ConfigAccumulator = this
 
       def get(key:String):Option[AccumulatedDependency] =
            dependencyMap.get(key)
@@ -132,7 +137,11 @@ package object hyrax  {
             caccum  + ("retries" -> AccumulatedDependency(retries = r))
       }
 
+      def and():ConfigAccumulator = this
+
     }
+
+  val l = List("one","two")
 
   implicit def HttpInsured(http:Http.type): InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration]  = {
     implicit val timeout: Timeout = 10 seconds
@@ -144,7 +153,8 @@ package object hyrax  {
     val host = "localhost"  //config.getString("hyrax.host")
     val port = "8080"       //config.getString("hyrax.port")
     val sr   =
-        for { Http.HostConnectorInfo(connector, _) <- IO(Http) ? Http.HostConnectorSetup(host,port.toInt) } yield sendReceive(connector)
+        for { Http.HostConnectorInfo(connector, _) <- IO(Http) ? Http.HostConnectorSetup(host,port.toInt) }
+        yield sendReceive(connector)
 
     new InsureDependent[HttpExt,Http.type,HttpDependencyConfiguration] {
 
@@ -161,15 +171,15 @@ package object hyrax  {
 
                 def requiring(config: => ConfigAccumulator):HttpDependencyConfiguration = {
                     val cfg = config
-                    val http =
+                    val accumDependency =
                     for {
                       fb <- cfg.get("fallback")
                       to <- cfg.get("timeout")
                       rt <- cfg.get("retries")
-                    } yield HttpDependencyConfiguration(null,fallback = fb.fallback,timeout = to.timeout,retries = rt.retries)
+                    } yield AccumulatedDependency(fallback = fb.fallback,timeout = to.timeout,retries = rt.retries)
 
-                    http match {
-                      case Some(HttpDependencyConfiguration(_,_,fb,rt,to,_))  =>
+                    accumDependency match {
+                      case Some(AccumulatedDependency(fb,rt,to))  =>
                              HttpDependencyConfiguration(sr,
                                                          dependent  = dependencyConfig ,
                                                          fallback   = fb               ,

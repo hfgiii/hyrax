@@ -1,6 +1,7 @@
 package org.hfgiii.hyrax
 
 import spray.can.Http
+import spray.httpx.RequestBuilding._
 import scala.concurrent.duration._
 
 /**
@@ -13,19 +14,25 @@ import scala.concurrent.duration._
 
 object HyraxStart  {
 
-      val          runfunc = (str:String) => str
+      val          get     = (url:String) => Get(url)
       val          fbfunc  = (str:String) => str
       implicit val httpc   = HttpDependencyConfiguration (null)
 
 
   def main(args: Array[String]) {
-    val httpCfg =
-    Http insure 10 of runfunc requiring {
-      //new ConfigAccumulator().retries(4).timeout(FiniteDuration(100,MICROSECONDS))
-      fallback(fbfunc) retries(4) timeout(FiniteDuration(100,MICROSECONDS))
-    }
 
-    println(httpCfg)
+    val httpWrapped =
+    become {
+       Http insure 10 of get requiring {
+           fallback {
+             fbfunc
+           } timeout {
+                FiniteDuration(100,MICROSECONDS)
+           }  retries 4
+
+        }
+    }
+    println(httpWrapped)
   }
 
 }
